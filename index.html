@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Bound Mario Adventure | Hackathon Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #dcdcdc; 
+            font-family: 'Amatic SC', cursive;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 960px;
+            height: 540px;
+        }
+
+        canvas {
+            background: #ffffff;
+            border: 5px solid #111;
+            border-radius: 40px 15px 45px 10px / 15px 45px 10px 40px;
+            box-shadow: 20px 20px 0px rgba(0,0,0,0.15);
+            display: block;
+        }
+
+        .layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #menu-layer { background: rgba(255,255,255,0.1); }
+        #game-over-layer { display: none; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(4px); }
+
+        .sketch-box {
+            background: #fff;
+            border: 4px solid #000;
+            padding: 40px;
+            text-align: center;
+            border-radius: 50px 20px 50px 20px / 20px 50px 20px 50px;
+            box-shadow: 10px 15px 0px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            font-size: 110px;
+            margin: 0;
+            line-height: 0.8;
+            color: #d32f2f;
+            text-shadow: 3px 3px 0px #000;
+            transform: rotate(-2deg);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: #fff;
+            border: 4px solid #000;
+            font-family: 'Amatic SC', cursive;
+            font-size: 35px;
+            min-width: 140px;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 15px;
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            background: #000;
+            color: #fff;
+            transform: scale(1.1) rotate(2deg);
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px; width: 900px;
+            left: 30px;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .hud-item {
+            font-size: 45px;
+            background: rgba(255,255,255,0.8);
+            border: 3px solid #000;
+            padding: 0 20px;
+            border-radius: 15px;
+        }
+
+        .goal-item {
+            font-size: 25px;
+            background: #fff59d;
+            border: 2px solid #000;
+            padding: 0 15px;
+            border-radius: 10px;
+            align-self: flex-start;
+        }
+
+        .lives-container { color: #d32f2f; font-size: 50px; }
+
+        #level-up-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            font-weight: bold;
+            color: #d32f2f;
+            text-shadow: 4px 4px 0px #000, 8px 8px 0px rgba(0,0,0,0.3);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 20;
+            animation: levelUpPulse 1.5s ease-out;
+        }
+
+        @keyframes levelUpPulse {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="menu-layer" class="layer">
+        <h1 id="main-title">WEB BOUND<br>MARIO ADVENTURE</h1>
+        <div style="font-size:30px; border:2px solid #000; padding:5px 20px; border-radius:50px; background:white; margin-top:10px;">COLLECT 10 COINS TO PASS LVL 1</div>
+        <div style="margin-bottom: 240px;"></div> 
+        <div class="btn-group">
+            <button onclick="startGame(1)">EASY</button>
+            <button onclick="startGame(1.5)">MEDIUM</button>
+            <button onclick="startGame(2.5)">HARD</button>
+        </div>
+    </div>
+
+    <div id="game-over-layer" class="layer">
+        <div class="sketch-box">
+            <h2 style="font-size:90px; color:#d32f2f; margin:0;">GAME OVER</h2>
+            <div style="font-size:45px;">SCORE: <span id="finalScore">0</span></div>
+            <div style="font-size:30px; margin-bottom:20px;">LEVEL REACHED: <span id="finalLevel">1</span></div>
+            <div class="btn-group">
+                <button onclick="resetGame()">PLAY AGAIN</button>
+                <button onclick="toMainMenu()">MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="hud">
+        <div class="hud-row">
+            <div class="hud-item">LVL: <span id="lvlVal">1</span> | SCORE: <span id="scoreVal">0</span></div>
+            <div class="hud-item lives-container" id="livesBox">❤❤❤</div>
+        </div>
+        <div class="goal-item" id="goalBox">GOAL: COLLECT <span id="goalVal">10</span> COINS FOR FLAG</div>
+    </div>
+
+    <div id="level-up-display"></div>
+
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function jitter(a) { return (Math.random() - 0.5) * a; }
+
+function thickInkLine(x1, y1, x2, y2, color="#000", width=3) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.bezierCurveTo(x1+(x2-x1)/3+jitter(5), y1+(y2-y1)/3+jitter(5), x1+2*(x2-x1)/3+jitter(5), y1+2*(y2-y1)/3+jitter(5), x2, y2);
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+function inkCircle(x, y, r, fill, stroke="#000", width=2.5) {
+    if(fill) {
+        ctx.fillStyle = fill;
+        ctx.beginPath(); ctx.arc(x, y, r*0.95, 0, Math.PI*2); ctx.fill();
+    }
+    if(stroke) {
+        ctx.beginPath();
+        for(let i=0; i<=12; i++) {
+            let a = (i/12)*Math.PI*2;
+            let ox = x + Math.cos(a)*r + jitter(2);
+            let oy = y + Math.sin(a)*r + jitter(2);
+            if(i===0) ctx.moveTo(ox, oy); else ctx.lineTo(ox, oy);
+        }
+        ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke();
+    }
+}
+
+function drawPrettyWeb(x, y, scale, angleRange) {
+    let size = 130 * scale;
+    ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 1;
+    let spokes = 7;
+    for(let i=0; i<spokes; i++) {
+        let a = (i/(spokes-1))*angleRange;
+        thickInkLine(x, y, x + Math.cos(a)*size, y + Math.sin(a)*size, "rgba(0,0,0,0.1)", 1);
+    }
+    for(let r=30; r<size; r+=25) {
+        ctx.beginPath();
+        for(let i=0; i<spokes; i++) {
+            let a = (i/(spokes-1))*angleRange;
+            let px = x + Math.cos(a)*r; let py = y + Math.sin(a)*r;
+            if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+    }
+}
+
+function drawSharperMario(x, y, facingRight, stepFrame, isDead=false) {
+    ctx.save();
+    ctx.translate(x, y);
+    if(!facingRight) ctx.scale(-1, 1);
+    if(isDead) ctx.rotate(Math.PI/2);
+    
+    let bob = Math.sin(stepFrame * 0.5) * 4;
+    inkCircle(-18, 28 + Math.cos(stepFrame)*6, 10, "#5d4037", "#111"); 
+    inkCircle(18, 28 - Math.cos(stepFrame)*6, 10, "#5d4037", "#111"); 
+    ctx.fillStyle = "#1565c0"; ctx.beginPath(); ctx.arc(0, 15+bob, 17, 0, Math.PI*2); ctx.fill();
+    inkCircle(0, 15+bob, 17, null, "#000", 3.5); 
+    inkCircle(-6, 10+bob, 3.5, "gold", "#000", 1); inkCircle(6, 10+bob, 3.5, "gold", "#000", 1); 
+    inkCircle(16, 12+bob, 7, "#d32f2f", "#111", 2); 
+    inkCircle(22, 16+bob, 9, "#fff", "#111", 2); 
+    ctx.translate(0, -10 + bob);
+    inkCircle(4, 4, 20, "#ffcc80", "#111", 3.5); 
+    inkCircle(18, 8, 9, "#ffcc80", "#111", 2); 
+    ctx.fillStyle = "#111"; ctx.beginPath();
+    ctx.moveTo(4, 12); ctx.bezierCurveTo(10, 8, 22, 12, 20, 18); ctx.bezierCurveTo(14, 21, 6, 21, 4, 12); ctx.fill();
+    ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(8, -2, 6, 9, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#42a5f5"; ctx.beginPath(); ctx.ellipse(10, -2, 3, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#d32f2f"; ctx.beginPath();
+    ctx.moveTo(-20, 2); ctx.quadraticCurveTo(0, -24, 22, 2); ctx.lineTo(32, 4); ctx.lineTo(-20, 2); ctx.fill();
+    thickInkLine(-20, 2, 32, 4, "#111", 4); 
+    ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(2, -10, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "red"; ctx.font = "bold 13px Arial"; ctx.fillText("M", -3, -5);
+    ctx.restore();
+}
+
+function drawCuteSpider(x, y, type='hanging') {
+    if(type === 'hanging') {
+        thickInkLine(x, y-400, x, y, "#999", 1.5);
+    }
+    inkCircle(x, y, 18, "#222", "#000", 4);
+    inkCircle(x, y+6, 5, "#d32f2f", null); 
+    inkCircle(x-8, y-6, 8, "#fff", "#000", 2); inkCircle(x+8, y-6, 8, "#fff", "#000", 2);
+    ctx.fillStyle="black"; ctx.beginPath(); ctx.arc(x-8, y-6, 3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x+8, y-6, 3, 0, Math.PI*2); ctx.fill();
+    for(let i=0; i<4; i++) {
+        thickInkLine(x-12, y+i*2, x-28, y+10+i*5, "#111", 2.5);
+        thickInkLine(x+12, y+i*2, x+28, y+10+i*5, "#111", 2.5);
+    }
+}
+
+function drawFlag(x, y) {
+    thickInkLine(x, y, x, y - 100, "#000", 4);
+    ctx.fillStyle = "white"; ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(x, y - 100, 40, 30);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "black";
+    for(let i=0; i<2; i++) {
+        for(let j=0; j<2; j++) {
+            if((i+j)%2 === 0) ctx.fillRect(x + i*20, y - 100 + j*15, 20, 15);
+        }
+    }
+}
+
+let gameState = 'MENU', gameLoopId, menuLoopId, score = 0, cameraX = 0, frameCount = 0;
+let level = 1, diffMultiplier = 1, lives = 3, coinsInLevel = 0, nextLevelThreshold = 10;
+let flagReached = false, goalMet = false, lastChunkX = 0;
+let levelUpDisplayTimeout = null;
+
+const player = { x: 100, y: 300, vx: 0, vy: 0, speed: 6.5, jump: -14, grounded: false, swinging: false, webX: 0, webY: 0, dead: false, facingRight: true };
+const keys = { right: false, left: false, up: false, space: false };
+let platforms = [], spiders = [], coins = [], decor = [], scenery = [], flag = null;
+
+function initGame() {
+    platforms = []; spiders = []; coins = []; decor = []; scenery = []; flag = null;
+    player.x = 100; player.y = 300; player.dead = false; lives = 3; level = 1; score = 0; cameraX = 0;
+    coinsInLevel = 0; nextLevelThreshold = 10; goalMet = false; lastChunkX = 0;
+    document.getElementById('livesBox').innerText = "❤❤❤";
+    document.getElementById('lvlVal').innerText = level;
+    document.getElementById('goalVal').innerText = nextLevelThreshold;
+    document.getElementById('goalBox').style.background = "#fff59d";
+    for(let i=0; i<15; i++) scenery.push({x: i*600, h: 180+jitter(100), type: 'mtn'});
+    addChunk(0); 
+}
+
+function addChunk(startX) {
+    lastChunkX = startX;
+    // Continuous Ground - lowered slightly
+    platforms.push({x: startX, y: 490, w: 2000, h: 80, type: 'ground'}); // Lowered from y:470 to y:490, reduced height
+
+    for(let i=0; i<6; i++) { // Reduced from 8 to 6 platforms per chunk
+        let px = startX + 300 + (i * 280); // Increased spacing
+        let py = 280 + jitter(120); // Lowered from 200+jitter(150) to 280+jitter(120)
+        
+        // Random Platform - pipes are now safe decorative elements
+        if(Math.random() > 0.7) platforms.push({x: px, y: 430, w: 70, h: 60, type: 'pipe'}); // Lowered from y:410 to y:430
+        else platforms.push({x: px, y: py, w: 120, h: 40, type: 'brick'});
+        
+        // Coins
+        coins.push({x: px + 40, y: py - 60, collected: false});
+        if(Math.random() > 0.4) coins.push({x: px + 120, y: 380 + jitter(40), collected: false}); // Lowered from 350+jitter(50)
+    }
+    
+    // MODERATE SPIDER COUNT - 3-4 spiders per chunk (balanced)
+    // Hanging Spiders (2 per chunk)
+    for(let s = 0; s < 2; s++) {
+        let px = startX + 400 + s * 300 + jitter(200);
+        spiders.push({
+            x: px, 
+            y: 300 + jitter(60), // Lowered from 250+jitter(80) to 300+jitter(60)
+            startX: px,
+            range: 120 + Math.random() * 60, // Slightly increased range
+            speed: (0.2 + Math.random()*0.1) * diffMultiplier,  // Moderately slow - increased from (0.1 + Math.random()*0.05)
+            type: 'hanging'
+        });
+    }
+    
+    // Walking Spider (1 per chunk, more common)
+    if(Math.random() > 0.5) { // 50% chance (increased from 30%)
+        let px = startX + 700 + jitter(250);
+        spiders.push({
+            x: px,
+            y: 490, // Match ground level
+            startX: px,
+            range: 180 + Math.random() * 60, // Slightly increased range
+            speed: (0.25 + Math.random()*0.15) * diffMultiplier,  // Moderately slow - increased from (0.15 + Math.random()*0.1)
+            type: 'walking'
+        });
+    }
+}
+
+function showLevelUp() {
+    const levelUpDisplay = document.getElementById('level-up-display');
+    levelUpDisplay.textContent = `LEVEL ${level}!`;
+    levelUpDisplay.style.opacity = '1';
+    levelUpDisplay.style.animation = 'none';
+    
+    // Trigger reflow to restart animation
+    levelUpDisplay.offsetHeight;
+    levelUpDisplay.style.animation = 'levelUpPulse 1.5s ease-out';
+    
+    // Clear any existing timeout
+    if (levelUpDisplayTimeout) {
+        clearTimeout(levelUpDisplayTimeout);
+    }
+    
+    // Hide after animation completes
+    levelUpDisplayTimeout = setTimeout(() => {
+        levelUpDisplay.style.opacity = '0';
+    }, 1500);
+}
+
+function update() {
+    if(player.dead) return;
+    frameCount++;
+
+    // Infinite level generation logic
+    if(player.x > lastChunkX + 1000) {
+        addChunk(lastChunkX + 2000);
+    }
+
+    if (keys.right) { player.vx += 0.85; player.facingRight = true; }
+    else if (keys.left) { player.vx -= 0.85; player.facingRight = false; }
+    else player.vx *= 0.82;
+    
+    if (player.vx > player.speed) player.vx = player.speed;
+    if (player.vx < -player.speed) player.vx = -player.speed;
+
+    if (keys.space && !player.swinging && !player.grounded) {
+        player.swinging = true; player.webX = player.x + (player.vx*22) + 60; player.webY = 0;
+    } else if (!keys.space) player.swinging = false;
+
+    if (player.swinging) {
+        player.vx += (player.webX - player.x) * 0.006; player.vy += (player.webY - player.y) * 0.006; player.vy += 0.35; 
+        let dx = player.x - player.webX, dy = player.y - player.webY, dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist > 270) { let a = Math.atan2(dy, dx); player.x = player.webX + Math.cos(a)*270; player.y = player.webY + Math.sin(a)*270; }
+    } else player.vy += 0.65; 
+
+    player.x += player.vx; player.y += player.vy;
+
+    player.grounded = false;
+    platforms.forEach(p => {
+        // Check if player is above the platform and falling onto it
+        if (player.x + 18 > p.x && player.x - 18 < p.x + p.w) {
+            // Player is within platform's horizontal bounds
+            if (player.vy > 0) { // Player is falling down
+                // Check if player's feet (bottom) will land on platform top
+                let playerBottom = player.y + 25; // Approximate bottom of Mario
+                if (playerBottom >= p.y && playerBottom - player.vy <= p.y) {
+                    // Land on top of platform
+                    player.y = p.y - 25; // Position Mario's center so bottom is at platform top
+                    player.vy = 0;
+                    player.grounded = true;
+                    player.swinging = false;
+                }
+            }
+            // Side collision (optional, for wall jumping feel)
+            else if (player.vy < 0) { // Player is jumping up
+                let playerTop = player.y - 25; // Approximate top of Mario
+                if (playerTop <= p.y + p.h && playerTop - player.vy >= p.y + p.h) {
+                    // Hit bottom of platform
+                    player.y = p.y + p.h + 25;
+                    player.vy = 0;
+                }
+            }
+        }
+    });
+    
+    // Ground boundary - prevent falling through bottom
+    if (player.y > 520) {
+        player.y = 520;
+        player.vy = 0;
+        player.grounded = true;
+        player.swinging = false;
+    }
+
+    if (keys.up && player.grounded) player.vy = player.jump;
+
+    // Coin Collection
+    coins.forEach(c => { 
+        if(!c.collected && Math.abs(player.x - c.x) < 40 && Math.abs((player.y-20) - c.y) < 40) { 
+            c.collected = true; score += 100; coinsInLevel++;
+            
+            if(coinsInLevel >= nextLevelThreshold && !goalMet) {
+                goalMet = true;
+                flag = { x: player.x + 600, y: 490 }; // Lowered to match ground
+                document.getElementById('goalBox').innerText = "RUN TO THE FLAG!";
+                document.getElementById('goalBox').style.background = "#c8e6c9";
+            }
+            if(!goalMet) document.getElementById('goalVal').innerText = nextLevelThreshold - coinsInLevel;
+        } 
+    });
+
+    // Flag Logic (Level Progression) - pipes are no longer dangerous
+    if(flag && Math.abs(player.x - flag.x) < 50) {
+        // Show level up display before updating level
+        showLevelUp();
+        
+        level++;
+        coinsInLevel = 0;
+        goalMet = false;
+        flag = null;
+        diffMultiplier += 0.3; // Slightly reduced difficulty scaling
+        nextLevelThreshold += 3; // Level 2 needs 13, Level 3 needs 16 etc (more gradual increase)
+        document.getElementById('lvlVal').innerText = level;
+        document.getElementById('goalBox').innerHTML = 'GOAL: COLLECT <span id="goalVal"></span> COINS FOR FLAG';
+        document.getElementById('goalVal').innerText = nextLevelThreshold;
+        document.getElementById('goalBox').style.background = "#fff59d";
+        
+        // Add bonus score for completing level
+        score += level * 300;
+        document.getElementById('scoreVal').innerText = score;
+    }
+
+    spiders.forEach(s => {
+        if(s.type === 'hanging') {
+            s.x = s.startX + Math.cos(frameCount * 0.015) * s.range; // Slightly faster oscillation
+            s.y += Math.sin(frameCount * 0.04) * s.speed; // Slightly faster vertical movement
+        } else if(s.type === 'walking') {
+            s.x = s.startX + Math.cos(frameCount * 0.02) * s.range; // Slightly faster oscillation
+        }
+        if(Math.abs(player.x - s.x) < 30 && Math.abs((player.y-25) - s.y) < 30) takeDamage();
+    });
+
+    // Pipes are no longer dangerous - removed pipe collision damage
+
+    if(player.x > 300) cameraX = player.x - 300;
+    document.getElementById('scoreVal').innerText = score;
+    if(player.y > 800) takeDamage();
+}
+
+function takeDamage() {
+    lives--;
+    document.getElementById('livesBox').innerText = "❤".repeat(Math.max(0, lives));
+    if(lives <= 0) triggerGameOver();
+    else { player.vx = 0; player.vy = 0; player.x -= 150; player.y = 100; }
+}
+
+function triggerGameOver() {
+    player.dead = true;
+    document.getElementById('finalScore').innerText = score;
+    document.getElementById('finalLevel').innerText = level;
+    document.getElementById('game-over-layer').style.display = 'flex';
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "rgba(0,0,0,0.03)"; ctx.lineWidth = 1;
+    for(let i=0; i<canvas.width; i+=8) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 540); ctx.stroke(); }
+
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    scenery.forEach(m => {
+        ctx.fillStyle = "#efefef"; ctx.beginPath(); ctx.moveTo(m.x, 490); ctx.lineTo(m.x+150, 490-m.h); ctx.lineTo(m.x+300, 490); ctx.fill();
+        ctx.strokeStyle = "#ccc"; ctx.stroke();
+    });
+    
+    thickInkLine(cameraX - 100, 490, cameraX + 1060, 490, "#222", 4); // Lowered ground line
+
+    platforms.forEach(p => { if(p.x > cameraX-150 && p.x < cameraX+1100) {
+        if(p.type==='pipe') {
+            ctx.fillStyle="#81c784"; ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 10); ctx.fill(); ctx.strokeStyle="#111"; ctx.stroke();
+            ctx.fillStyle="#a5d6a7"; ctx.beginPath(); ctx.roundRect(p.x-5, p.y, p.w+10, 25, 5); ctx.fill(); ctx.stroke();
+        } else if(p.type==='brick') {
+            ctx.fillStyle="#bcaaa4"; ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 5); ctx.fill(); ctx.strokeStyle="#111"; ctx.stroke();
+        }
+    }});
+
+    coins.forEach(c => { if(!c.collected && c.x > cameraX-50 && c.x < cameraX+1100) {
+        inkCircle(c.x, c.y, 18, "#ffd700", "#f57f17", 2.5);
+        ctx.fillStyle="#f57f17"; ctx.font="bold 28px Amatic SC"; ctx.fillText("1", c.x-5, c.y+10);
+    }});
+
+    spiders.forEach(s => { if(s.x > cameraX-100 && s.x < cameraX+1100) drawCuteSpider(s.x, s.y, s.type); });
+    
+    if(flag) drawFlag(flag.x, flag.y);
+    
+    if(player.swinging) thickInkLine(player.x, player.y-20, player.webX, player.webY, "#999", 2.5);
+    drawSharperMario(player.x, player.y-25, player.facingRight, frameCount*0.35);
+    ctx.restore();
+}
+
+function loop() { if(gameState === 'PLAYING') { update(); drawGame(); requestAnimationFrame(loop); } }
+
+function menuLoop() {
+    if(gameState !== 'MENU') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frameCount++;
+    drawPrettyWeb(0, 0, 2.0, Math.PI/2); drawPrettyWeb(960, 0, 2.0, Math.PI/2);
+    let a = Math.sin(frameCount * 0.04) * 0.28;
+    ctx.save(); ctx.translate(480, -60); ctx.rotate(a);
+    thickInkLine(0, 0, 0, 330, "#666", 2.5);
+    ctx.translate(0, 330); ctx.rotate(Math.PI);
+    drawSharperMario(0, 0, true, 0); ctx.restore();
+    menuLoopId = requestAnimationFrame(menuLoop);
+}
+
+function startGame(mult) {
+    gameState = 'PLAYING';
+    diffMultiplier = mult;
+    document.getElementById('menu-layer').style.display = 'none';
+    document.getElementById('game-over-layer').style.display = 'none';
+    document.getElementById('hud').style.display = 'flex';
+    initGame();
+    cancelAnimationFrame(menuLoopId);
+    loop();
+}
+
+function resetGame() { startGame(diffMultiplier); }
+function toMainMenu() { location.reload(); }
+
+window.onload = function() { gameState = 'MENU'; menuLoop(); }
+window.onkeydown = e => { if(e.key==='ArrowRight') keys.right=true; if(e.key==='ArrowLeft') keys.left=true; if(e.key==='ArrowUp') keys.up=true; if(e.key===' ') keys.space=true; };
+window.onkeyup = e => { if(e.key==='ArrowRight') keys.right=false; if(e.key==='ArrowLeft') keys.left=false; if(e.key==='ArrowUp') keys.up=false; if(e.key===' ') keys.space=false; };
+
+</script>
+</body>
+</html>
+
